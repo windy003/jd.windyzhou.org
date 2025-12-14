@@ -1,8 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GGYL6D2XPB"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-GGYL6D2XPB');
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='180x180.png') }}"> 
     <title>建德本地信息发布</title>
     <style>
         * {
@@ -158,6 +168,26 @@
             font-size: 16px;
         }
 
+        .post-images {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .post-images img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .post-images img:hover {
+            transform: scale(1.05);
+        }
+
         @media (min-width: 768px) {
             .container {
                 max-width: 600px;
@@ -245,6 +275,11 @@
                             <span class="post-category category-${post.category}">${post.category}</span>
                         </div>
                         <div class="post-content">${escapeHtml(post.content)}</div>
+                        ${post.images && post.images.length > 0 ? `
+                            <div class="post-images">
+                                ${post.images.map(img => `<img src="/uploads/${img}" alt="图片" onclick="window.open('/uploads/${img}')">`).join('')}
+                            </div>
+                        ` : ''}
                         <div class="post-footer">
                             <div class="post-contact">📞 ${escapeHtml(post.contact)}</div>
                             <div class="post-time">${formatTime(post.timestamp)}</div>

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='180x180.png') }}"> 
     <title>站长管理 - 信息发布</title>
     <style>
         * {
@@ -314,6 +315,34 @@
             cursor: pointer;
         }
 
+        .edit-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+
+        .btn-cancel {
+            width: 100%;
+            padding: 14px;
+            background: #757575;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-cancel:active {
+            transform: scale(0.98);
+        }
+
         .empty-state {
             text-align: center;
             padding: 20px;
@@ -341,6 +370,80 @@
             border-radius: 4px;
             font-family: monospace;
             color: #d63384;
+        }
+
+        .btn-upload {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            color: #667eea;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-upload:hover {
+            background: #f0f0ff;
+        }
+
+        .image-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            padding-top: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .image-preview-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-preview-item .remove-image {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .post-images {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .post-images img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
         }
 
         @media (min-width: 768px) {
@@ -393,8 +496,9 @@
             </div>
 
             <div class="publish-section">
-                <h2 style="margin-bottom: 15px; color: #333; font-size: 18px;">发布新信息</h2>
+                <h2 id="formTitle" style="margin-bottom: 15px; color: #333; font-size: 18px;">发布新信息</h2>
                 <form id="publishForm">
+                    <input type="hidden" id="editingPostId" value="">
                     <div class="form-group">
                         <label for="category">分类</label>
                         <select id="category" required>
@@ -418,7 +522,14 @@
                         <label for="contact">联系方式</label>
                         <input type="text" id="contact" placeholder="电话/微信等" required>
                     </div>
-                    <button type="submit" class="btn">发布信息</button>
+                    <div class="form-group">
+                        <label for="images">上传图片（最多9张）</label>
+                        <input type="file" id="images" accept="image/*" multiple style="display: none;">
+                        <button type="button" class="btn-upload" onclick="document.getElementById('images').click()">选择图片</button>
+                        <div id="imagePreview" class="image-preview"></div>
+                    </div>
+                    <button type="submit" class="btn" id="submitBtn">发布信息</button>
+                    <button type="button" class="btn-cancel" id="cancelBtn" style="display: none; margin-top: 10px;">取消编辑</button>
                 </form>
             </div>
 
@@ -431,9 +542,231 @@
 
     <script>
         let posts = [];
+        let uploadedImages = [];
 
         // 页面加载时检查登录状态
         checkLoginStatus();
+
+        // 图片压缩函数
+        async function compressImage(file, maxSizeMB = 2, maxWidthOrHeight = 1920, quality = 0.8) {
+            // 如果文件小于限制，直接返回
+            if (file.size <= maxSizeMB * 1024 * 1024) {
+                console.log('图片无需压缩:', file.size, 'bytes');
+                return file;
+            }
+
+            console.log('开始压缩图片:', file.name, '原始大小:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // 计算压缩后的尺寸
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidthOrHeight || height > maxWidthOrHeight) {
+                            if (width > height) {
+                                height = Math.round(height * maxWidthOrHeight / width);
+                                width = maxWidthOrHeight;
+                            } else {
+                                width = Math.round(width * maxWidthOrHeight / height);
+                                height = maxWidthOrHeight;
+                            }
+                        }
+
+                        // 创建 Canvas 进行压缩
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // 转换为 Blob
+                        canvas.toBlob(function(blob) {
+                            if (!blob) {
+                                reject(new Error('图片压缩失败'));
+                                return;
+                            }
+
+                            // 创建新的 File 对象
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+
+                            console.log('压缩完成:',
+                                '原始:', (file.size / 1024 / 1024).toFixed(2), 'MB',
+                                '压缩后:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB',
+                                '压缩比:', ((1 - compressedFile.size / file.size) * 100).toFixed(1), '%'
+                            );
+
+                            resolve(compressedFile);
+                        }, 'image/jpeg', quality);
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 图片选择处理
+        document.getElementById('images').addEventListener('change', async function(e) {
+            const files = Array.from(e.target.files);
+
+            if (uploadedImages.length + files.length > 9) {
+                alert('最多只能上传9张图片');
+                return;
+            }
+
+            const uploadButton = document.querySelector('.btn-upload');
+            const originalText = uploadButton.textContent;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (uploadedImages.length >= 9) break;
+
+                if (!file.type.startsWith('image/')) {
+                    alert(`文件 "${file.name}" 不是图片格式，已跳过`);
+                    continue;
+                }
+
+                // 检查文件大小（16MB）
+                if (file.size > 16 * 1024 * 1024) {
+                    alert(`图片 "${file.name}" 超过16MB限制，已跳过`);
+                    continue;
+                }
+
+                // 如果图片大于2MB，自动压缩
+                let fileToUpload = file;
+                if (file.size > 2 * 1024 * 1024) {
+                    uploadButton.textContent = `正在压缩图片 ${i + 1}/${files.length}...`;
+                    try {
+                        fileToUpload = await compressImage(file);
+                    } catch (error) {
+                        console.error('图片压缩失败:', error);
+                        alert(`图片 "${file.name}" 压缩失败，将尝试上传原图`);
+                        fileToUpload = file;
+                    }
+                }
+
+                // 显示上传进度
+                uploadButton.textContent = `正在上传 ${i + 1}/${files.length}...`;
+
+                // 上传图片到服务器
+                const formData = new FormData();
+                formData.append('image', fileToUpload);
+
+                try {
+                    console.log('开始上传:', file.name, file.type, file.size);
+
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin',  // 重要：包含 Session Cookie
+                        // 不设置 Content-Type，让浏览器自动设置（包括 boundary）
+                    });
+
+                    console.log('响应状态:', response.status);
+                    console.log('响应头:', response.headers);
+
+                    // 检查响应是否成功
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('服务器返回错误:', errorText);
+                        throw new Error(`服务器错误 (${response.status}): ${errorText}`);
+                    }
+
+                    const result = await response.json();
+                    console.log('响应结果:', result);
+
+                    if (result.success) {
+                        uploadedImages.push(result.filename);
+                        renderImagePreview();
+                        console.log('上传成功:', result.filename);
+                    } else {
+                        alert(`上传 "${file.name}" 失败：${result.message}`);
+                        console.error('上传失败:', result.message);
+                    }
+                } catch (error) {
+                    console.error('上传错误详情:', error);
+                    console.error('错误类型:', error.name);
+                    console.error('错误消息:', error.message);
+                    console.error('错误堆栈:', error.stack);
+
+                    let errorMsg = error.message;
+                    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+                        errorMsg = '网络连接失败，可能原因：\n1. 服务器未运行\n2. 文件太大导致超时\n3. 浏览器阻止了请求\n\n请检查服务器控制台的错误信息';
+                    }
+                    alert(`上传 "${file.name}" 失败：\n${errorMsg}`);
+                }
+            }
+
+            // 恢复按钮文本
+            uploadButton.textContent = originalText;
+
+            // 清空文件选择器
+            e.target.value = '';
+        });
+
+        // 渲染图片预览
+        function renderImagePreview() {
+            const previewContainer = document.getElementById('imagePreview');
+            previewContainer.innerHTML = uploadedImages.map((filename, index) => `
+                <div class="image-preview-item">
+                    <img src="/uploads/${filename}" alt="预览">
+                    <button type="button" class="remove-image" onclick="removeImage(${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        // 删除图片
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            renderImagePreview();
+        }
+
+        // 编辑信息
+        function editPost(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            // 填充表单
+            document.getElementById('editingPostId').value = post.id;
+            document.getElementById('category').value = post.category;
+            document.getElementById('title').value = post.title;
+            document.getElementById('content').value = post.content;
+            document.getElementById('contact').value = post.contact;
+            uploadedImages = post.images ? [...post.images] : [];
+            renderImagePreview();
+
+            // 修改UI
+            document.getElementById('formTitle').textContent = '编辑信息';
+            document.getElementById('submitBtn').textContent = '更新信息';
+            document.getElementById('cancelBtn').style.display = 'block';
+
+            // 滚动到表单
+            document.querySelector('.publish-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 取消编辑
+        document.getElementById('cancelBtn').addEventListener('click', function() {
+            resetForm();
+        });
+
+        function resetForm() {
+            document.getElementById('editingPostId').value = '';
+            document.getElementById('publishForm').reset();
+            uploadedImages = [];
+            renderImagePreview();
+            document.getElementById('formTitle').textContent = '发布新信息';
+            document.getElementById('submitBtn').textContent = '发布信息';
+            document.getElementById('cancelBtn').style.display = 'none';
+        }
 
         async function checkLoginStatus() {
             try {
@@ -563,12 +896,20 @@
                             <span class="post-category category-${post.category}">${post.category}</span>
                         </div>
                         <div class="post-content">${escapeHtml(post.content)}</div>
+                        ${post.images && post.images.length > 0 ? `
+                            <div class="post-images">
+                                ${post.images.map(img => `<img src="/uploads/${img}" alt="图片" onclick="window.open('/uploads/${img}')">`).join('')}
+                            </div>
+                        ` : ''}
                         <div class="post-footer">
                             <div>
                                 <div class="post-contact">📞 ${escapeHtml(post.contact)}</div>
                                 <div class="post-time">${formatTime(post.timestamp)}</div>
                             </div>
-                            <button class="delete-btn" onclick="deletePost(${post.id})">删除</button>
+                            <div>
+                                <button class="edit-btn" onclick="editPost(${post.id})">编辑</button>
+                                <button class="delete-btn" onclick="deletePost(${post.id})">删除</button>
+                            </div>
                         </div>
                     </div>
                 `).join('');
@@ -601,38 +942,45 @@
             }
         }
 
-        // 发布信息
+        // 发布/更新信息
         document.getElementById('publishForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const newPost = {
+            const editingPostId = document.getElementById('editingPostId').value;
+            const isEditing = editingPostId !== '';
+
+            const postData = {
                 category: document.getElementById('category').value,
                 title: document.getElementById('title').value,
                 content: document.getElementById('content').value,
                 contact: document.getElementById('contact').value,
-                timestamp: Date.now()
+                images: uploadedImages,
+                timestamp: isEditing ? posts.find(p => p.id == editingPostId).timestamp : Date.now()
             };
 
             try {
-                const response = await fetch('/api/posts', {
-                    method: 'POST',
+                const url = isEditing ? `/api/posts/${editingPostId}` : '/api/posts';
+                const method = isEditing ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(newPost)
+                    body: JSON.stringify(postData)
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    this.reset();
+                    resetForm();
                     loadPosts();
-                    alert('信息发布成功！');
+                    alert(isEditing ? '信息更新成功！' : '信息发布成功！');
                 } else {
-                    alert('发布失败：' + result.message);
+                    alert((isEditing ? '更新' : '发布') + '失败：' + result.message);
                 }
             } catch (error) {
-                alert('发布失败，请检查网络连接');
+                alert((isEditing ? '更新' : '发布') + '失败，请检查网络连接');
             }
         });
     </script>

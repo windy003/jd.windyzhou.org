@@ -1,28 +1,31 @@
 # 建德本地信息发布系统
 
-一个基于 Flask 的本地信息发布网站，支持站长发布信息，用户浏览信息。账号密码安全存储在服务器端。
+一个基于 Flask 的本地信息发布网站，支持站长发布信息（含图片），用户浏览信息。使用 SQLite 数据库存储，账号密码安全加密。
 
 ## 功能特点
 
 ### 前台页面
 - 📱 移动端优化设计
-- 🏷️ 支持分类筛选（出售、求购、招聘、求职、租房、其他）
+- 🏷️ 支持分类筛选（出售、求购、招聘、出租房屋、出售房屋、其他）
 - 📞 显示站长联系方式
+- 🖼️ 图片瀑布流展示，点击查看大图
 - 🔍 只读浏览，用户无法发布
 
 ### 后台管理
 - 🔐 安全的账号密码登录（密码哈希加密）
-- ✏️ 发布新信息
-- 🗑️ 删除已发布信息
+- ✏️ 发布新信息（支持上传最多 9 张图片）
+- 🖼️ 图片实时预览，拖拽删除
+- 🗑️ 删除已发布信息（自动删除关联图片）
 - 📋 管理所有信息
 
 ## 项目结构
 
 ```
-tmp/
+jd.windyzhou.org/
 ├── app.py                 # Flask 后端应用
 ├── requirements.txt       # Python 依赖
-├── posts.json            # 数据存储文件（自动生成）
+├── posts.db              # SQLite 数据库（自动生成）
+├── uploads/              # 图片上传目录（自动生成）
 ├── templates/
 │   ├── index.html        # 前台页面
 │   └── admin.html        # 后台管理页面
@@ -45,19 +48,25 @@ python --version
 pip install -r requirements.txt
 ```
 
-### 3. 配置账号密码和联系方式
+### 3. 配置账号密码和联系方式（推荐使用环境变量）
 
-打开 `app.py` 文件，修改以下内容：
+**方法一：使用环境变量（推荐）**
 
-**修改账号密码（第 13-14 行）：**
-```python
-ADMIN_USERNAME = 'admin'                              # 修改为你的账号
-ADMIN_PASSWORD_HASH = generate_password_hash('123456')  # 修改引号内的密码
+创建 `.env` 文件：
+```bash
+SECRET_KEY=your-secret-key-here
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=123456
+ADMIN_CONTACT=周秋良:手机:15868404601,微信同号
 ```
 
-**修改站长联系方式（第 17 行）：**
+**方法二：直接修改代码**
+
+打开 `app.py` 文件，修改第 23-28 行：
 ```python
-ADMIN_CONTACT = "微信: webmaster123 | 电话: 138-0000-0000"  # 修改为你的联系方式
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', '你的账号')
+admin_password = os.getenv('ADMIN_PASSWORD', '你的密码')
+ADMIN_CONTACT = os.getenv('ADMIN_CONTACT', "你的联系方式")
 ```
 
 ### 4. 启动服务器
@@ -87,8 +96,13 @@ python app.py
 ### 访问后台管理
 在浏览器打开：`http://127.0.0.1:5000/admin`
 1. 输入账号密码登录
-2. 发布新信息
-3. 管理已发布的信息
+2. 发布新信息：
+   - 选择分类
+   - 填写标题和内容
+   - 输入联系方式
+   - 可选：点击"选择图片"上传图片（最多9张，支持 png/jpg/jpeg/gif/webp）
+   - 点击"发布信息"
+3. 管理已发布的信息：查看、删除信息
 
 ### 手机访问
 如果要让局域网内的手机访问：
@@ -113,9 +127,16 @@ python app.py
 
 ## 数据存储
 
-所有信息数据存储在 `posts.json` 文件中，格式为 JSON。
-- 服务器启动时自动加载
-- 发布/删除信息时自动保存
+- **数据库：** 使用 SQLite 数据库（`posts.db`）存储所有信息
+  - 服务器启动时自动创建数据库和表结构
+  - 支持高并发访问
+  - 数据持久化存储
+
+- **图片文件：** 上传的图片保存在 `uploads/` 目录
+  - 文件名采用 UUID 命名，避免冲突
+  - 删除信息时自动删除关联图片
+  - 支持格式：png, jpg, jpeg, gif, webp
+  - 单文件最大 16MB
 
 ## 常见问题
 
@@ -129,7 +150,10 @@ app.run(debug=True, host='0.0.0.0', port=5000)  # 修改 port 参数
 修改 `app.py` 第 14 行的密码，重启服务器即可。
 
 ### 3. 数据丢失怎么办？
-定期备份 `posts.json` 文件。
+定期备份 `posts.db` 数据库文件和 `uploads/` 图片目录。
+
+### 3.1 如何迁移旧数据（从 JSON 到 SQLite）？
+如果你之前使用的是 JSON 版本，可以手动导入数据到数据库，或联系开发者获取迁移脚本。
 
 ### 4. 如何部署到服务器？
 - 使用 Gunicorn 或 uWSGI 作为生产服务器
@@ -140,8 +164,10 @@ app.run(debug=True, host='0.0.0.0', port=5000)  # 修改 port 参数
 
 - **后端：** Python + Flask
 - **前端：** HTML + CSS + JavaScript
-- **数据存储：** JSON 文件
-- **安全：** Werkzeug 密码哈希
+- **数据库：** SQLite 3
+- **文件存储：** 本地文件系统
+- **安全：** Werkzeug 密码哈希 + Session 管理
+- **图片处理：** Werkzeug 文件上传
 
 ## 开发者
 
