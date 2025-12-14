@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>站长管理 - 信息发布</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 15px;
+            width: 100%;
+        }
+
+        /* 登录页面样式 */
+        .login-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .login-box {
+            background: white;
+            padding: 30px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-header h1 {
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .login-header p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .login-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .login-form label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .login-form input[type="text"],
+        .login-form input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .login-form input[type="text"]:focus,
+        .login-form input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .config-hint {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #1976d2;
+            border-left: 3px solid #2196F3;
+        }
+
+        .config-hint code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #d63384;
+        }
+
+        /* 管理页面样式 */
+        .admin-page {
+            display: none;
+            padding-top: 20px;
+        }
+
+        .admin-page.show {
+            display: block;
+        }
+
+        header {
+            background: white;
+            padding: 20px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border-radius: 12px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .back-link, .logout-link {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .logout-link {
+            color: #f44336;
+            cursor: pointer;
+        }
+
+        .publish-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .manage-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .manage-section h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .post-card {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .post-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+            flex: 1;
+        }
+
+        .post-category {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .category-出售 { background: #4CAF50; }
+        .category-求购 { background: #2196F3; }
+        .category-招聘 { background: #FF9800; }
+        .category-出租房屋 { background: #00BCD4; }
+        .category-出售房屋 { background: #E91E63; }
+        .category-其他 { background: #607D8B; }
+
+        .post-content {
+            color: #666;
+            line-height: 1.6;
+            margin: 10px 0;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .post-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .post-time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .post-contact {
+            font-size: 13px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .contact-config {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ffc107;
+        }
+
+        .contact-config p {
+            margin: 0;
+            font-size: 14px;
+            color: #856404;
+        }
+
+        .contact-config code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #d63384;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                max-width: 600px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="loginPage" class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>🔐 站长登录</h1>
+                <p>请输入管理员账号密码</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">账号</label>
+                    <input type="text" id="username" autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" autocomplete="current-password" required>
+                </div>
+                <button type="submit" class="btn" id="loginBtn">登录</button>
+                <div id="errorMessage" class="error-message">账号或密码错误</div>
+            </form>
+            <div class="config-hint">
+                <strong>修改账号密码：</strong>在 <code>app.py</code> 第 <code>13-14</code> 行修改 <code>ADMIN_USERNAME</code> 和密码
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理页面 -->
+    <div id="adminPage" class="admin-page">
+        <div class="container">
+            <header>
+                <h1>🔧 站长管理面板</h1>
+                <div class="header-actions">
+                    <a href="/" class="back-link">← 返回前台查看</a>
+                    <a class="logout-link" onclick="logout()">退出登录</a>
+                </div>
+            </header>
+
+            <div class="contact-config">
+                <p><strong>修改站长联系方式：</strong>在 <code>app.py</code> 第 17 行修改 <code>ADMIN_CONTACT</code> 变量</p>
+            </div>
+
+            <div class="publish-section">
+                <h2 style="margin-bottom: 15px; color: #333; font-size: 18px;">发布新信息</h2>
+                <form id="publishForm">
+                    <div class="form-group">
+                        <label for="category">分类</label>
+                        <select id="category" required>
+                            <option value="出售">出售</option>
+                            <option value="求购">求购</option>
+                            <option value="招聘">招聘</option>
+                            <option value="出租房屋">出租房屋</option>
+                            <option value="出售房屋">出售房屋</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="title">标题</label>
+                        <input type="text" id="title" placeholder="请输入标题" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="content">详细内容</label>
+                        <textarea id="content" placeholder="请输入详细信息..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="contact">联系方式</label>
+                        <input type="text" id="contact" placeholder="电话/微信等" required>
+                    </div>
+                    <button type="submit" class="btn">发布信息</button>
+                </form>
+            </div>
+
+            <div class="manage-section">
+                <h2>已发布信息管理</h2>
+                <div id="postsSection"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let posts = [];
+
+        // 页面加载时检查登录状态
+        checkLoginStatus();
+
+        async function checkLoginStatus() {
+            try {
+                const response = await fetch('/api/check_login');
+                const result = await response.json();
+
+                if (result.logged_in) {
+                    showAdminPage();
+                } else {
+                    showLoginPage();
+                }
+            } catch (error) {
+                showLoginPage();
+            }
+        }
+
+        // 登录表单提交
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = '登录中...';
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAdminPage();
+                } else {
+                    document.getElementById('errorMessage').classList.add('show');
+                    setTimeout(() => {
+                        document.getElementById('errorMessage').classList.remove('show');
+                    }, 3000);
+                }
+            } catch (error) {
+                alert('登录失败，请检查网络连接');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        });
+
+        // 退出登录
+        async function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                    showLoginPage();
+                } catch (error) {
+                    console.error('退出登录失败:', error);
+                }
+            }
+        }
+
+        function showLoginPage() {
+            document.getElementById('loginPage').style.display = 'block';
+            document.getElementById('adminPage').classList.remove('show');
+            document.body.style.display = 'flex';
+        }
+
+        function showAdminPage() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('adminPage').classList.add('show');
+            document.body.style.display = 'block';
+            loadPosts();
+        }
+
+        // 加载信息列表
+        async function loadPosts() {
+            try {
+                const response = await fetch('/api/posts');
+                const result = await response.json();
+
+                if (result.success) {
+                    posts = result.data;
+                    renderPosts();
+                }
+            } catch (error) {
+                console.error('加载信息失败:', error);
+            }
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            if (diff < 60000) {
+                return '刚刚';
+            } else if (diff < 3600000) {
+                return Math.floor(diff / 60000) + '分钟前';
+            } else if (diff < 86400000) {
+                return Math.floor(diff / 3600000) + '小时前';
+            } else if (diff < 2592000000) {
+                return Math.floor(diff / 86400000) + '天前';
+            } else {
+                return date.toLocaleDateString('zh-CN');
+            }
+        }
+
+        function renderPosts() {
+            const postsSection = document.getElementById('postsSection');
+
+            if (posts.length === 0) {
+                postsSection.innerHTML = '<div class="empty-state">暂无已发布信息</div>';
+                return;
+            }
+
+            postsSection.innerHTML = posts
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .map((post) => `
+                    <div class="post-card">
+                        <div class="post-header">
+                            <h3 class="post-title">${escapeHtml(post.title)}</h3>
+                            <span class="post-category category-${post.category}">${post.category}</span>
+                        </div>
+                        <div class="post-content">${escapeHtml(post.content)}</div>
+                        <div class="post-footer">
+                            <div>
+                                <div class="post-contact">📞 ${escapeHtml(post.contact)}</div>
+                                <div class="post-time">${formatTime(post.timestamp)}</div>
+                            </div>
+                            <button class="delete-btn" onclick="deletePost(${post.id})">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 删除信息
+        async function deletePost(postId) {
+            if (confirm('确定要删除这条信息吗？')) {
+                try {
+                    const response = await fetch(`/api/posts/${postId}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        loadPosts();
+                    } else {
+                        alert('删除失败：' + result.message);
+                    }
+                } catch (error) {
+                    alert('删除失败，请检查网络连接');
+                }
+            }
+        }
+
+        // 发布信息
+        document.getElementById('publishForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const newPost = {
+                category: document.getElementById('category').value,
+                title: document.getElementById('title').value,
+                content: document.getElementById('content').value,
+                contact: document.getElementById('contact').value,
+                timestamp: Date.now()
+            };
+
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newPost)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    this.reset();
+                    loadPosts();
+                    alert('信息发布成功！');
+                } else {
+                    alert('发布失败：' + result.message);
+                }
+            } catch (error) {
+                alert('发布失败，请检查网络连接');
+            }
+        });
+    </script>
+</body>
+</html>

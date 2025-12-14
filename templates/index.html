@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>建德本地信息发布</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        header {
+            background: white;
+            padding: 20px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .admin-contact {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .admin-contact strong {
+            font-size: 16px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .filter-section {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .filter-section select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 0;
+        }
+
+        .filter-section label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .posts-section {
+            margin-bottom: 20px;
+        }
+
+        .post-card {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .post-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+            flex: 1;
+        }
+
+        .post-category {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        .category-出售 { background: #4CAF50; }
+        .category-求购 { background: #2196F3; }
+        .category-招聘 { background: #FF9800; }
+        .category-出租房屋 { background: #00BCD4; }
+        .category-出售房屋 { background: #E91E63; }
+        .category-其他 { background: #607D8B; }
+
+        .post-content {
+            color: #666;
+            line-height: 1.6;
+            margin: 10px 0;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .post-footer {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .post-time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .post-contact {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            font-size: 16px;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                max-width: 600px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📢 建德本地信息发布</h1>
+        <div class="admin-contact">
+            <strong>发布信息请联系站长</strong>
+            <div>{{ admin_contact }}</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="filter-section">
+            <label for="filterCategory">筛选分类</label>
+            <select id="filterCategory">
+                <option value="全部">全部</option>
+                <option value="出售">出售</option>
+                <option value="求购">求购</option>
+                <option value="招聘">招聘</option>
+                <option value="出租房屋">出租房屋</option>
+                <option value="出售房屋">出售房屋</option>
+                <option value="其他">其他</option>
+            </select>
+        </div>
+
+        <div class="posts-section" id="postsSection"></div>
+    </div>
+
+    <script>
+        let posts = [];
+
+        // 从服务器加载信息
+        async function loadPosts(category = '全部') {
+            try {
+                const response = await fetch(`/api/posts?category=${encodeURIComponent(category)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    posts = result.data;
+                    renderPosts();
+                }
+            } catch (error) {
+                console.error('加载信息失败:', error);
+            }
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            if (diff < 60000) {
+                return '刚刚';
+            } else if (diff < 3600000) {
+                return Math.floor(diff / 60000) + '分钟前';
+            } else if (diff < 86400000) {
+                return Math.floor(diff / 3600000) + '小时前';
+            } else if (diff < 2592000000) {
+                return Math.floor(diff / 86400000) + '天前';
+            } else {
+                return date.toLocaleDateString('zh-CN');
+            }
+        }
+
+        function renderPosts() {
+            const postsSection = document.getElementById('postsSection');
+
+            if (posts.length === 0) {
+                postsSection.innerHTML = '<div class="empty-state">暂无信息</div>';
+                return;
+            }
+
+            postsSection.innerHTML = posts
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .map((post) => `
+                    <div class="post-card">
+                        <div class="post-header">
+                            <h3 class="post-title">${escapeHtml(post.title)}</h3>
+                            <span class="post-category category-${post.category}">${post.category}</span>
+                        </div>
+                        <div class="post-content">${escapeHtml(post.content)}</div>
+                        <div class="post-footer">
+                            <div class="post-contact">📞 ${escapeHtml(post.contact)}</div>
+                            <div class="post-time">${formatTime(post.timestamp)}</div>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.getElementById('filterCategory').addEventListener('change', function(e) {
+            loadPosts(e.target.value);
+        });
+
+        // 页面加载时获取所有信息
+        loadPosts();
+    </script>
+</body>
+</html>
