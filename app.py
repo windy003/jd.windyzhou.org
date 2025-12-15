@@ -64,9 +64,18 @@ def init_db():
             content TEXT NOT NULL,
             contact TEXT NOT NULL,
             images TEXT,
-            timestamp INTEGER NOT NULL
+            timestamp INTEGER NOT NULL,
+            price TEXT
         )
     ''')
+
+    # 如果表已存在但没有price字段，则添加price字段
+    try:
+        cursor.execute("SELECT price FROM posts LIMIT 1")
+    except sqlite3.OperationalError:
+        # price字段不存在，添加它
+        cursor.execute("ALTER TABLE posts ADD COLUMN price TEXT")
+
     conn.commit()
     conn.close()
 
@@ -105,7 +114,8 @@ def get_posts():
             'content': row['content'],
             'contact': row['contact'],
             'images': json.loads(row['images']) if row['images'] else [],
-            'timestamp': row['timestamp']
+            'timestamp': row['timestamp'],
+            'price': row['price'] if 'price' in row.keys() else None
         }
         posts.append(post)
 
@@ -152,15 +162,16 @@ def create_post():
     images_json = json.dumps(data.get('images', []))
 
     cursor.execute('''
-        INSERT INTO posts (category, title, content, contact, images, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO posts (category, title, content, contact, images, timestamp, price)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', (
         data.get('category'),
         data.get('title'),
         data.get('content'),
         data.get('contact'),
         images_json,
-        data.get('timestamp')
+        data.get('timestamp'),
+        data.get('price')
     ))
 
     conn.commit()
@@ -174,7 +185,8 @@ def create_post():
         'content': data.get('content'),
         'contact': data.get('contact'),
         'images': data.get('images', []),
-        'timestamp': data.get('timestamp')
+        'timestamp': data.get('timestamp'),
+        'price': data.get('price')
     }
 
     return jsonify({'success': True, 'message': '发布成功', 'data': new_post})
@@ -216,7 +228,7 @@ def update_post(post_id):
     # 更新数据库记录
     cursor.execute('''
         UPDATE posts
-        SET category = ?, title = ?, content = ?, contact = ?, images = ?
+        SET category = ?, title = ?, content = ?, contact = ?, images = ?, price = ?
         WHERE id = ?
     ''', (
         data.get('category'),
@@ -224,6 +236,7 @@ def update_post(post_id):
         data.get('content'),
         data.get('contact'),
         images_json,
+        data.get('price'),
         post_id
     ))
 
@@ -237,7 +250,8 @@ def update_post(post_id):
         'content': data.get('content'),
         'contact': data.get('contact'),
         'images': new_images,
-        'timestamp': data.get('timestamp')
+        'timestamp': data.get('timestamp'),
+        'price': data.get('price')
     }
 
     return jsonify({'success': True, 'message': '更新成功', 'data': updated_post})

@@ -143,6 +143,13 @@
             white-space: pre-wrap;
         }
 
+        .post-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: #E91E63;
+            margin: 10px 0;
+        }
+
         .post-footer {
             margin-top: 10px;
             padding-top: 10px;
@@ -275,6 +282,7 @@
                             <span class="post-category category-${post.category}">${post.category}</span>
                         </div>
                         <div class="post-content">${escapeHtml(post.content)}</div>
+                        ${post.price ? `<div class="post-price">💰 ${escapeHtml(post.price)}</div>` : ''}
                         ${post.images && post.images.length > 0 ? `
                             <div class="post-images">
                                 ${post.images.map(img => `<img src="/uploads/${img}" alt="图片" onclick="window.open('/uploads/${img}')">`).join('')}
