@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='180x180.png') }}">
+    <title>用户中心 - 信息发布</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px 15px;
+        }
+
+        header {
+            background: white;
+            padding: 20px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border-radius: 12px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .user-info {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .back-link, .logout-link {
+            color: #667eea;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .logout-link {
+            color: #f44336;
+        }
+
+        .publish-section, .manage-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .publish-section h2, .manage-section h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-cancel {
+            background: #757575;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .btn-upload {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            color: #667eea;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-upload:hover {
+            background: #f0f0ff;
+        }
+
+        .image-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .image-preview-item {
+            position: relative;
+            padding-top: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .image-preview-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .image-preview-item .remove-image {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .post-card {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .post-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin: 0;
+            flex: 1;
+        }
+
+        .post-category {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            margin-left: 10px;
+        }
+
+        .category-出售 { background: #4CAF50; }
+        .category-求购 { background: #2196F3; }
+        .category-招聘 { background: #FF9800; }
+        .category-出租房屋 { background: #00BCD4; }
+        .category-出售房屋 { background: #E91E63; }
+        .category-其他 { background: #607D8B; }
+
+        .post-content {
+            color: #666;
+            line-height: 1.6;
+            margin: 10px 0;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .post-price {
+            font-size: 16px;
+            font-weight: 700;
+            color: #E91E63;
+            margin: 8px 0;
+        }
+
+        .post-images {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .post-images img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .post-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .post-contact {
+            font-size: 13px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .post-time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .edit-btn, .delete-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            margin-left: 5px;
+        }
+
+        .edit-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👤 用户中心</h1>
+            <div class="user-info" id="userInfo">加载中...</div>
+            <div class="header-actions">
+                <a href="/" class="back-link">← 返回首页</a>
+                <a class="logout-link" onclick="logout()">退出登录</a>
+            </div>
+        </header>
+
+        <div class="publish-section">
+            <h2 id="formTitle">发布新信息</h2>
+            <form id="publishForm">
+                <input type="hidden" id="editingPostId" value="">
+                <div class="form-group">
+                    <label for="category">分类</label>
+                    <select id="category" required>
+                        <option value="出售">出售</option>
+                        <option value="求购">求购</option>
+                        <option value="招聘">招聘</option>
+                        <option value="出租房屋">出租房屋</option>
+                        <option value="出售房屋">出售房屋</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="title">标题</label>
+                    <input type="text" id="title" placeholder="请输入标题" required>
+                </div>
+                <div class="form-group">
+                    <label for="content">详细内容</label>
+                    <textarea id="content" placeholder="请输入详细信息..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="contact">联系方式</label>
+                    <input type="text" id="contact" placeholder="电话/微信等" required>
+                </div>
+                <div class="form-group">
+                    <label for="price">价格（可选）</label>
+                    <input type="text" id="price" placeholder="例如：500元、面议、3000元/月">
+                </div>
+                <div class="form-group">
+                    <label for="images">上传图片（最多9张）</label>
+                    <input type="file" id="images" accept="image/*" multiple style="display: none;">
+                    <button type="button" class="btn-upload" onclick="document.getElementById('images').click()">选择图片</button>
+                    <div id="imagePreview" class="image-preview"></div>
+                </div>
+                <button type="submit" class="btn" id="submitBtn">发布信息</button>
+                <button type="button" class="btn btn-cancel" id="cancelBtn">取消编辑</button>
+            </form>
+        </div>
+
+        <div class="manage-section">
+            <h2>我的信息</h2>
+            <div id="postsSection"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/compressorjs@1.1.1/dist/compressor.min.js"></script>
+    <script>
+        let posts = [];
+        let uploadedImages = [];
+        let currentUser = null;
+
+        // 页面加载时检查登录状态
+        checkLoginStatus();
+
+        async function checkLoginStatus() {
+            try {
+                const response = await fetch('/api/check_login');
+                const result = await response.json();
+
+                if (!result.logged_in) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                currentUser = result.user;
+                document.getElementById('userInfo').textContent = `欢迎，${currentUser.username}`;
+                loadMyPosts();
+            } catch (error) {
+                window.location.href = '/login';
+            }
+        }
+
+        // 退出登录
+        async function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                    window.location.href = '/';
+                } catch (error) {
+                    console.error('退出登录失败:', error);
+                }
+            }
+        }
+
+        // 图片压缩函数
+        async function compressImage(file, maxSizeMB = 2, maxWidthOrHeight = 1920, quality = 0.8) {
+            if (file.size <= maxSizeMB * 1024 * 1024) {
+                return file;
+            }
+
+            return new Promise((resolve, reject) => {
+                new Compressor(file, {
+                    quality: quality,
+                    maxWidth: maxWidthOrHeight,
+                    maxHeight: maxWidthOrHeight,
+                    success(result) {
+                        const compressedFile = new File([result], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    },
+                    error(err) {
+                        reject(err);
+                    }
+                });
+            });
+        }
+
+        // 图片选择处理
+        document.getElementById('images').addEventListener('change', async function(e) {
+            const files = Array.from(e.target.files);
+
+            if (uploadedImages.length + files.length > 9) {
+                alert('最多只能上传9张图片');
+                return;
+            }
+
+            const uploadButton = document.querySelector('.btn-upload');
+            const originalText = uploadButton.textContent;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (uploadedImages.length >= 9) break;
+
+                if (!file.type.startsWith('image/')) {
+                    alert(`文件 "${file.name}" 不是图片格式，已跳过`);
+                    continue;
+                }
+
+                if (file.size > 16 * 1024 * 1024) {
+                    alert(`图片 "${file.name}" 超过16MB限制，已跳过`);
+                    continue;
+                }
+
+                // 压缩图片
+                let fileToUpload = file;
+                if (file.size > 2 * 1024 * 1024) {
+                    uploadButton.textContent = `正在压缩图片 ${i + 1}/${files.length}...`;
+                    try {
+                        fileToUpload = await compressImage(file);
+                    } catch (error) {
+                        console.error('图片压缩失败:', error);
+                        fileToUpload = file;
+                    }
+                }
+
+                uploadButton.textContent = `正在上传 ${i + 1}/${files.length}...`;
+
+                // 上传图片
+                const formData = new FormData();
+                formData.append('image', fileToUpload);
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        uploadedImages.push(result.filename);
+                        renderImagePreview();
+                    } else {
+                        alert(`上传 "${file.name}" 失败：${result.message}`);
+                    }
+                } catch (error) {
+                    alert(`上传 "${file.name}" 失败：网络错误`);
+                }
+            }
+
+            uploadButton.textContent = originalText;
+            e.target.value = '';
+        });
+
+        // 渲染图片预览
+        function renderImagePreview() {
+            const previewContainer = document.getElementById('imagePreview');
+            previewContainer.innerHTML = uploadedImages.map((filename, index) => `
+                <div class="image-preview-item">
+                    <img src="/uploads/${filename}" alt="预览">
+                    <button type="button" class="remove-image" onclick="removeImage(${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        // 删除图片
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            renderImagePreview();
+        }
+
+        // 加载我的信息
+        async function loadMyPosts() {
+            try {
+                const response = await fetch('/api/my_posts');
+                const result = await response.json();
+
+                if (result.success) {
+                    posts = result.data;
+                    renderPosts();
+                }
+            } catch (error) {
+                console.error('加载信息失败:', error);
+            }
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            if (diff < 60000) {
+                return '刚刚';
+            } else if (diff < 3600000) {
+                return Math.floor(diff / 60000) + '分钟前';
+            } else if (diff < 86400000) {
+                return Math.floor(diff / 3600000) + '小时前';
+            } else if (diff < 2592000000) {
+                return Math.floor(diff / 86400000) + '天前';
+            } else {
+                return date.toLocaleDateString('zh-CN');
+            }
+        }
+
+        function renderPosts() {
+            const postsSection = document.getElementById('postsSection');
+
+            if (posts.length === 0) {
+                postsSection.innerHTML = '<div class="empty-state">还没有发布任何信息</div>';
+                return;
+            }
+
+            postsSection.innerHTML = posts
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .map((post) => `
+                    <div class="post-card">
+                        <div class="post-header">
+                            <h3 class="post-title">${escapeHtml(post.title)}</h3>
+                            <span class="post-category category-${post.category}">${post.category}</span>
+                        </div>
+                        <div class="post-content">${escapeHtml(post.content)}</div>
+                        ${post.price ? `<div class="post-price">💰 ${escapeHtml(post.price)}</div>` : ''}
+                        ${post.images && post.images.length > 0 ? `
+                            <div class="post-images">
+                                ${post.images.map(img => `<img src="/uploads/${img}" alt="图片" onclick="window.open('/uploads/${img}')">`).join('')}
+                            </div>
+                        ` : ''}
+                        <div class="post-footer">
+                            <div>
+                                <div class="post-contact">📞 ${escapeHtml(post.contact)}</div>
+                                <div class="post-time">${formatTime(post.timestamp)}</div>
+                            </div>
+                            <div>
+                                <button class="edit-btn" onclick="editPost(${post.id})">编辑</button>
+                                <button class="delete-btn" onclick="deletePost(${post.id})">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 编辑信息
+        function editPost(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            document.getElementById('editingPostId').value = post.id;
+            document.getElementById('category').value = post.category;
+            document.getElementById('title').value = post.title;
+            document.getElementById('content').value = post.content;
+            document.getElementById('contact').value = post.contact;
+            document.getElementById('price').value = post.price || '';
+            uploadedImages = post.images ? [...post.images] : [];
+            renderImagePreview();
+
+            document.getElementById('formTitle').textContent = '编辑信息';
+            document.getElementById('submitBtn').textContent = '更新信息';
+            document.getElementById('cancelBtn').style.display = 'block';
+
+            document.querySelector('.publish-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 取消编辑
+        document.getElementById('cancelBtn').addEventListener('click', function() {
+            resetForm();
+        });
+
+        function resetForm() {
+            document.getElementById('editingPostId').value = '';
+            document.getElementById('publishForm').reset();
+            uploadedImages = [];
+            renderImagePreview();
+            document.getElementById('formTitle').textContent = '发布新信息';
+            document.getElementById('submitBtn').textContent = '发布信息';
+            document.getElementById('cancelBtn').style.display = 'none';
+        }
+
+        // 删除信息
+        async function deletePost(postId) {
+            if (confirm('确定要删除这条信息吗？')) {
+                try {
+                    const response = await fetch(`/api/posts/${postId}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        loadMyPosts();
+                    } else {
+                        alert('删除失败：' + result.message);
+                    }
+                } catch (error) {
+                    alert('删除失败，请检查网络连接');
+                }
+            }
+        }
+
+        // 发布/更新信息
+        document.getElementById('publishForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const editingPostId = document.getElementById('editingPostId').value;
+            const isEditing = editingPostId !== '';
+
+            const postData = {
+                category: document.getElementById('category').value,
+                title: document.getElementById('title').value,
+                content: document.getElementById('content').value,
+                contact: document.getElementById('contact').value,
+                price: document.getElementById('price').value,
+                images: uploadedImages,
+                timestamp: isEditing ? posts.find(p => p.id == editingPostId).timestamp : Date.now()
+            };
+
+            try {
+                const url = isEditing ? `/api/posts/${editingPostId}` : '/api/posts';
+                const method = isEditing ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(postData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    resetForm();
+                    loadMyPosts();
+                    alert(isEditing ? '信息更新成功！' : '信息发布成功！');
+                } else {
+                    alert((isEditing ? '更新' : '发布') + '失败：' + result.message);
+                }
+            } catch (error) {
+                alert((isEditing ? '更新' : '发布') + '失败，请检查网络连接');
+            }
+        });
+    </script>
+</body>
+</html>

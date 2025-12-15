@@ -2,12 +2,15 @@ from flask import Flask, render_template, request, jsonify, session, send_from_d
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from functools import wraps
 import json
 import os
 import sqlite3
 from datetime import timedelta
 from dotenv import load_dotenv
 import uuid
+import time
+import re
 
 # 加载环境变量
 load_dotenv()
@@ -15,7 +18,7 @@ load_dotenv()
 app = Flask(__name__)
 # 从环境变量读取 secret_key，如果不存在则使用随机生成的（仅用于开发）
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 # CORS 配置 - 允许所有来源（开发环境）
 CORS(app, resources={
@@ -56,6 +59,8 @@ def init_db():
     """初始化数据库"""
     conn = get_db()
     cursor = conn.cursor()
+
+    # 创建posts表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,7 +70,8 @@ def init_db():
             contact TEXT NOT NULL,
             images TEXT,
             timestamp INTEGER NOT NULL,
-            price TEXT
+            price TEXT,
+            user_id INTEGER
         )
     ''')
 
@@ -73,25 +79,196 @@ def init_db():
     try:
         cursor.execute("SELECT price FROM posts LIMIT 1")
     except sqlite3.OperationalError:
-        # price字段不存在，添加它
         cursor.execute("ALTER TABLE posts ADD COLUMN price TEXT")
+
+    # 如果表已存在但没有user_id字段，则添加user_id字段
+    try:
+        cursor.execute("SELECT user_id FROM posts LIMIT 1")
+    except sqlite3.OperationalError:
+        cursor.execute("ALTER TABLE posts ADD COLUMN user_id INTEGER")
+
+    # 创建users表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at INTEGER NOT NULL,
+            last_login INTEGER
+        )
+    ''')
+
+    # 创建索引
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_username ON users(username)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_role ON users(role)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_status ON users(status)')
 
     conn.commit()
     conn.close()
 
+    # 迁移管理员到users表
+    migrate_admin_to_users()
+
+def migrate_admin_to_users():
+    """将环境变量中的管理员迁移到users表"""
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD_HASH:
+        return
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 检查管理员是否已存在
+    cursor.execute('SELECT id FROM users WHERE username = ?', (ADMIN_USERNAME,))
+    if cursor.fetchone():
+        conn.close()
+        return  # 已存在，无需重复创建
+
+    # 创建管理员账户
+    cursor.execute('''
+        INSERT INTO users (username, password_hash, role, status, created_at)
+        VALUES (?, ?, 'admin', 'active', ?)
+    ''', (ADMIN_USERNAME, ADMIN_PASSWORD_HASH, int(time.time() * 1000)))
+
+    conn.commit()
+    conn.close()
+    print(f"管理员账户 '{ADMIN_USERNAME}' 已创建")
+
+def validate_username(username):
+    """验证用户名格式"""
+    if not username or len(username) < 3 or len(username) > 20:
+        return False, "用户名长度应为3-20个字符"
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        return False, "用户名只能包含字母、数字和下划线"
+    return True, ""
+
+def validate_password(password):
+    """验证密码格式"""
+    if not password or len(password) < 6 or len(password) > 20:
+        return False, "密码长度应为6-20个字符"
+    return True, ""
+
+def username_exists(username):
+    """检查用户名是否已存在"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+def authenticate_user(username, password):
+    """验证用户身份"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, password_hash, role, status FROM users WHERE username = ?', (username,))
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+        return None, "用户名或密码错误"
+
+    if user['status'] == 'disabled':
+        conn.close()
+        return None, "账户已被禁用"
+
+    if not check_password_hash(user['password_hash'], password):
+        conn.close()
+        return None, "用户名或密码错误"
+
+    # 更新最后登录时间
+    cursor.execute('UPDATE users SET last_login = ? WHERE id = ?',
+                   (int(time.time() * 1000), user['id']))
+    conn.commit()
+    conn.close()
+
+    return {
+        'id': user['id'],
+        'username': username,
+        'role': user['role']
+    }, None
+
 def allowed_file(filename):
     """检查文件扩展名是否允许"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# 权限装饰器
+def login_required(f):
+    """需要登录"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': '未登录'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """需要管理员权限"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': '未登录'}), 401
+        if session.get('role') != 'admin':
+            return jsonify({'success': False, 'message': '权限不足'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def post_owner_or_admin(f):
+    """信息所有者或管理员"""
+    @wraps(f)
+    def decorated_function(post_id, *args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': '未登录'}), 401
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT user_id FROM posts WHERE id = ?', (post_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({'success': False, 'message': '信息不存在'}), 404
+
+        post_user_id = row['user_id']
+        is_owner = post_user_id == session.get('user_id')
+        is_admin = session.get('role') == 'admin'
+
+        if not (is_owner or is_admin):
+            return jsonify({'success': False, 'message': '无权操作'}), 403
+
+        return f(post_id, *args, **kwargs)
+    return decorated_function
 
 # 路由：前台页面
 @app.route('/')
 def index():
     return render_template('index.html', admin_contact=ADMIN_CONTACT)
 
+# 路由：用户注册页面
+@app.route('/register')
+def register_page():
+    return render_template('register.html')
+
+# 路由：用户登录页面
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
+
+# 路由：用户中心页面
+@app.route('/user_center')
+def user_center():
+    return render_template('user_center.html')
+
 # 路由：后台登录页面
 @app.route('/admin')
 def admin():
     return render_template('admin.html')
+
+# 路由：管理员用户管理页面
+@app.route('/admin/users')
+def admin_users():
+    return render_template('admin_users.html')
 
 # API：获取所有信息
 @app.route('/api/posts', methods=['GET'])
@@ -122,38 +299,94 @@ def get_posts():
     conn.close()
     return jsonify({'success': True, 'data': posts})
 
-# API：站长登录
+# API：用户注册
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+
+    # 验证用户名
+    valid, msg = validate_username(username)
+    if not valid:
+        return jsonify({'success': False, 'message': msg}), 400
+
+    # 验证密码
+    valid, msg = validate_password(password)
+    if not valid:
+        return jsonify({'success': False, 'message': msg}), 400
+
+    # 检查用户名是否已存在
+    if username_exists(username):
+        return jsonify({'success': False, 'message': '用户名已存在'}), 400
+
+    # 创建用户
+    password_hash = generate_password_hash(password)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO users (username, password_hash, role, status, created_at)
+        VALUES (?, ?, 'user', 'active', ?)
+    ''', (username, password_hash, int(time.time() * 1000)))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'message': '注册成功'})
+
+# API：用户登录
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username', '')
+    username = data.get('username', '').strip()
     password = data.get('password', '')
 
-    if username == ADMIN_USERNAME and check_password_hash(ADMIN_PASSWORD_HASH, password):
-        session['admin_logged_in'] = True
+    if not username or not password:
+        return jsonify({'success': False, 'message': '用户名或密码不能为空'}), 400
+
+    # 先尝试从users表验证
+    user, error = authenticate_user(username, password)
+    if user:
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        session['role'] = user['role']
         session.permanent = True
-        return jsonify({'success': True, 'message': '登录成功'})
-    else:
-        return jsonify({'success': False, 'message': '账号或密码错误'})
+        return jsonify({
+            'success': True,
+            'message': '登录成功',
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'role': user['role']
+            }
+        })
+
+    return jsonify({'success': False, 'message': error}), 401
 
 # API：检查登录状态
 @app.route('/api/check_login', methods=['GET'])
 def check_login():
-    is_logged_in = session.get('admin_logged_in', False)
-    return jsonify({'success': True, 'logged_in': is_logged_in})
+    if 'user_id' in session:
+        return jsonify({
+            'success': True,
+            'logged_in': True,
+            'user': {
+                'id': session.get('user_id'),
+                'username': session.get('username'),
+                'role': session.get('role')
+            }
+        })
+    return jsonify({'success': True, 'logged_in': False})
 
 # API：退出登录
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    session.pop('admin_logged_in', None)
+    session.clear()
     return jsonify({'success': True, 'message': '已退出登录'})
 
 # API：发布信息（需要登录）
 @app.route('/api/posts', methods=['POST'])
+@login_required
 def create_post():
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': '未登录'}), 401
-
     data = request.get_json()
 
     conn = get_db()
@@ -162,8 +395,8 @@ def create_post():
     images_json = json.dumps(data.get('images', []))
 
     cursor.execute('''
-        INSERT INTO posts (category, title, content, contact, images, timestamp, price)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO posts (category, title, content, contact, images, timestamp, price, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         data.get('category'),
         data.get('title'),
@@ -171,7 +404,8 @@ def create_post():
         data.get('contact'),
         images_json,
         data.get('timestamp'),
-        data.get('price')
+        data.get('price'),
+        session.get('user_id')
     ))
 
     conn.commit()
@@ -186,17 +420,16 @@ def create_post():
         'contact': data.get('contact'),
         'images': data.get('images', []),
         'timestamp': data.get('timestamp'),
-        'price': data.get('price')
+        'price': data.get('price'),
+        'user_id': session.get('user_id')
     }
 
     return jsonify({'success': True, 'message': '发布成功', 'data': new_post})
 
-# API：更新信息（需要登录）
+# API：更新信息（需要登录且是所有者或管理员）
 @app.route('/api/posts/<int:post_id>', methods=['PUT'])
+@post_owner_or_admin
 def update_post(post_id):
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': '未登录'}), 401
-
     data = request.get_json()
 
     conn = get_db()
@@ -256,11 +489,37 @@ def update_post(post_id):
 
     return jsonify({'success': True, 'message': '更新成功', 'data': updated_post})
 
-# API：删除信息（需要登录）
+# API：获取我的信息
+@app.route('/api/my_posts', methods=['GET'])
+@login_required
+def get_my_posts():
+    user_id = session.get('user_id')
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM posts WHERE user_id = ? ORDER BY timestamp DESC', (user_id,))
+
+    posts = []
+    for row in cursor.fetchall():
+        post = {
+            'id': row['id'],
+            'category': row['category'],
+            'title': row['title'],
+            'content': row['content'],
+            'contact': row['contact'],
+            'images': json.loads(row['images']) if row['images'] else [],
+            'timestamp': row['timestamp'],
+            'price': row['price'] if 'price' in row.keys() else None,
+            'user_id': row['user_id']
+        }
+        posts.append(post)
+
+    conn.close()
+    return jsonify({'success': True, 'data': posts})
+
+# API：删除信息（需要登录且是所有者或管理员）
 @app.route('/api/posts/<int:post_id>', methods=['DELETE'])
+@post_owner_or_admin
 def delete_post(post_id):
-    if not session.get('admin_logged_in'):
-        return jsonify({'success': False, 'message': '未登录'}), 401
 
     conn = get_db()
     cursor = conn.cursor()
@@ -287,14 +546,11 @@ def delete_post(post_id):
 
 # API：上传图片（需要登录）
 @app.route('/api/upload', methods=['POST'])
+@login_required
 def upload_image():
     try:
         print("=== 图片上传请求 ===")
-        print(f"登录状态: {session.get('admin_logged_in')}")
-
-        if not session.get('admin_logged_in'):
-            print("错误: 未登录")
-            return jsonify({'success': False, 'message': '未登录'}), 401
+        print(f"登录用户: {session.get('username')}")
 
         # 检查请求内容长度
         print(f"Content-Length: {request.content_length}")
@@ -369,6 +625,115 @@ def upload_image():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# API：获取用户列表（仅管理员）
+@app.route('/api/admin/users', methods=['GET'])
+@admin_required
+def get_users():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 获取用户列表及其发布数量
+    cursor.execute('''
+        SELECT
+            u.id,
+            u.username,
+            u.role,
+            u.status,
+            u.created_at,
+            u.last_login,
+            COUNT(p.id) as posts_count
+        FROM users u
+        LEFT JOIN posts p ON u.id = p.user_id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+    ''')
+
+    users = []
+    for row in cursor.fetchall():
+        user = {
+            'id': row['id'],
+            'username': row['username'],
+            'role': row['role'],
+            'status': row['status'],
+            'created_at': row['created_at'],
+            'last_login': row['last_login'],
+            'posts_count': row['posts_count']
+        }
+        users.append(user)
+
+    conn.close()
+    return jsonify({'success': True, 'data': users})
+
+# API：禁用/启用用户（仅管理员）
+@app.route('/api/admin/users/<int:user_id>/status', methods=['PUT'])
+@admin_required
+def update_user_status(user_id):
+    data = request.get_json()
+    new_status = data.get('status')
+
+    if new_status not in ['active', 'disabled']:
+        return jsonify({'success': False, 'message': '状态值无效'}), 400
+
+    # 不能禁用自己
+    if user_id == session.get('user_id'):
+        return jsonify({'success': False, 'message': '不能禁用自己的账户'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 检查用户是否存在
+    cursor.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify({'success': False, 'message': '用户不存在'}), 404
+
+    # 更新状态
+    cursor.execute('UPDATE users SET status = ? WHERE id = ?', (new_status, user_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'message': '用户状态已更新'})
+
+# API：获取统计数据（仅管理员）
+@app.route('/api/admin/stats', methods=['GET'])
+@admin_required
+def get_stats():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 总用户数
+    cursor.execute('SELECT COUNT(*) as count FROM users')
+    total_users = cursor.fetchone()['count']
+
+    # 活跃用户数
+    cursor.execute('SELECT COUNT(*) as count FROM users WHERE status = "active"')
+    active_users = cursor.fetchone()['count']
+
+    # 禁用用户数
+    cursor.execute('SELECT COUNT(*) as count FROM users WHERE status = "disabled"')
+    disabled_users = cursor.fetchone()['count']
+
+    # 总信息数
+    cursor.execute('SELECT COUNT(*) as count FROM posts')
+    total_posts = cursor.fetchone()['count']
+
+    # 今日发布数（最近24小时）
+    today_timestamp = int(time.time() * 1000) - 24 * 60 * 60 * 1000
+    cursor.execute('SELECT COUNT(*) as count FROM posts WHERE timestamp > ?', (today_timestamp,))
+    posts_today = cursor.fetchone()['count']
+
+    conn.close()
+
+    stats = {
+        'total_users': total_users,
+        'active_users': active_users,
+        'disabled_users': disabled_users,
+        'total_posts': total_posts,
+        'posts_today': posts_today
+    }
+
+    return jsonify({'success': True, 'data': stats})
 
 if __name__ == '__main__':
     # 创建必要的目录

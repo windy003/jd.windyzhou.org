@@ -207,8 +207,11 @@
     <header>
         <h1>📢 建德本地供求信息发布</h1>
         <div class="admin-contact">
-            <strong>发布信息请联系周站长，目前免费</strong>
-            <div>{{ admin_contact }}</div>
+            有问题或建议,请联系站长:周秋良,手机:15868404601微信同号
+        </div>
+        <div id="authNav" style="text-align: center; margin-top: 10px; font-size: 14px;">
+            <a href="/register" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">注册</a> |
+            <a href="/login" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">登录</a>
         </div>
     </header>
 
@@ -231,6 +234,66 @@
 
     <script>
         let posts = [];
+        let currentUser = null;
+
+        // 检查登录状态并更新导航栏
+        async function checkLoginStatus() {
+            try {
+                const response = await fetch('/api/check_login');
+                const result = await response.json();
+
+                if (result.logged_in) {
+                    currentUser = result.user;
+                    updateNavBar(true, result.user);
+                } else {
+                    currentUser = null;
+                    updateNavBar(false, null);
+                }
+            } catch (error) {
+                console.error('检查登录状态失败:', error);
+                updateNavBar(false, null);
+            }
+        }
+
+        // 更新导航栏
+        function updateNavBar(isLoggedIn, user) {
+            const authNav = document.getElementById('authNav');
+
+            if (isLoggedIn && user) {
+                const centerLink = user.role === 'admin'
+                    ? '<a href="/admin" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">管理后台</a>'
+                    : '<a href="/user_center" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">个人中心</a>';
+
+                authNav.innerHTML = `
+                    <span style="color: #667eea; font-weight: 600;">欢迎, ${escapeHtml(user.username)}</span> |
+                    ${centerLink} |
+                    <a href="#" onclick="logout(); return false;" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">退出登录</a>
+                `;
+            } else {
+                authNav.innerHTML = `
+                    <a href="/register" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">注册</a> |
+                    <a href="/login" style="color: #667eea; text-decoration: none; margin: 0 10px; font-weight: 600;">登录</a>
+                `;
+            }
+        }
+
+        // 退出登录
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    currentUser = null;
+                    updateNavBar(false, null);
+                    alert('已退出登录');
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+            }
+        }
 
         // 从服务器加载信息
         async function loadPosts(category = '全部') {
@@ -306,7 +369,8 @@
             loadPosts(e.target.value);
         });
 
-        // 页面加载时获取所有信息
+        // 页面加载时检查登录状态并获取所有信息
+        checkLoginStatus();
         loadPosts();
     </script>
 </body>

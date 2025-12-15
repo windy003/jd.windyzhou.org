@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='180x180.png') }}">
+    <title>用户管理 - 管理员</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 15px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .header-actions a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .stats-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .stats-section h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .users-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .users-section h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .user-card {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .user-meta {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .user-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .badge-admin {
+            background: #FF9800;
+            color: white;
+        }
+
+        .badge-user {
+            background: #2196F3;
+            color: white;
+        }
+
+        .badge-active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .badge-disabled {
+            background: #f44336;
+            color: white;
+        }
+
+        .user-actions button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+
+        .btn-enable {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-disable {
+            background: #f44336;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👥 用户管理</h1>
+            <div class="header-actions">
+                <a href="/admin">← 返回管理后台</a>
+                <a href="/">返回首页</a>
+            </div>
+        </header>
+
+        <div class="stats-section">
+            <h2>📊 统计数据</h2>
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">总用户数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">活跃用户</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">禁用用户</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">总信息数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-</div>
+                    <div class="stat-label">今日发布</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="users-section">
+            <h2>用户列表</h2>
+            <div id="usersSection">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        // 检查登录和权限
+        checkPermission();
+
+        async function checkPermission() {
+            try {
+                const response = await fetch('/api/check_login');
+                const result = await response.json();
+
+                if (!result.logged_in || result.user.role !== 'admin') {
+                    alert('需要管理员权限');
+                    window.location.href = '/admin';
+                    return;
+                }
+
+                currentUser = result.user;
+                loadStats();
+                loadUsers();
+            } catch (error) {
+                window.location.href = '/admin';
+            }
+        }
+
+        // 加载统计数据
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const result = await response.json();
+
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('statsGrid').innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.total_users}</div>
+                            <div class="stat-label">总用户数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.active_users}</div>
+                            <div class="stat-label">活跃用户</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.disabled_users}</div>
+                            <div class="stat-label">禁用用户</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.total_posts}</div>
+                            <div class="stat-label">总信息数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.posts_today}</div>
+                            <div class="stat-label">今日发布</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+            }
+        }
+
+        // 加载用户列表
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                const result = await response.json();
+
+                if (result.success) {
+                    renderUsers(result.data);
+                }
+            } catch (error) {
+                console.error('加载用户列表失败:', error);
+            }
+        }
+
+        function renderUsers(users) {
+            const usersSection = document.getElementById('usersSection');
+
+            if (users.length === 0) {
+                usersSection.innerHTML = '<div class="empty-state">暂无用户</div>';
+                return;
+            }
+
+            usersSection.innerHTML = users.map(user => `
+                <div class="user-card">
+                    <div class="user-info">
+                        <div class="user-name">
+                            ${escapeHtml(user.username)}
+                            <span class="user-badge badge-${user.role}">${user.role === 'admin' ? '管理员' : '普通用户'}</span>
+                            <span class="user-badge badge-${user.status}">${user.status === 'active' ? '正常' : '已禁用'}</span>
+                        </div>
+                        <div class="user-meta">
+                            ID: ${user.id} |
+                            发布数: ${user.posts_count} |
+                            注册: ${formatDate(user.created_at)} |
+                            ${user.last_login ? '最后登录: ' + formatDate(user.last_login) : '从未登录'}
+                        </div>
+                    </div>
+                    <div class="user-actions">
+                        ${user.id !== currentUser.id ? `
+                            ${user.status === 'active'
+                                ? `<button class="btn-disable" onclick="toggleUserStatus(${user.id}, 'disabled')">禁用</button>`
+                                : `<button class="btn-enable" onclick="toggleUserStatus(${user.id}, 'active')">启用</button>`
+                            }
+                        ` : '<span style="color: #999; font-size: 12px;">(当前用户)</span>'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 切换用户状态
+        async function toggleUserStatus(userId, newStatus) {
+            const action = newStatus === 'disabled' ? '禁用' : '启用';
+            if (!confirm(`确定要${action}这个用户吗？`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`${action}成功`);
+                    loadUsers();
+                    loadStats();
+                } else {
+                    alert(`${action}失败：` + result.message);
+                }
+            } catch (error) {
+                alert(`${action}失败，请检查网络连接`);
+            }
+        }
+    </script>
+</body>
+</html>
