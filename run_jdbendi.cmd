@@ -1,0 +1,1 @@
+cd  /d  "D:\files\using\Web\jdbendi.com"  && start /b  pythonw  "D:\files\using\Web\jdbendi.com\app.py"  
